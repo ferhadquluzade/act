@@ -11,6 +11,13 @@ npm install
 npm install -g
 ```
 
+## Usage
+
+```
+act
+act file.txt
+```
+
 ## Project Structure
 
 ```
