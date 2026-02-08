@@ -1,6 +1,6 @@
-# Act Editor - Modular Structure
+# Act Editor 
 
-A terminal-based text editor built with blessed, organized into clean components.
+A terminal-based text editor built in Javascript/Node.js.
 
 ## Installation
 
