@@ -16,7 +16,7 @@ npm install -g
 ```
 act file.txt
 ```
-> Note: You can also use `act` to start
+> Note: You can also use `act` to get started.
 
 ## Project Structure
 
