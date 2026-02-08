@@ -92,13 +92,6 @@ act-editor/
 - **themes.js**: Theme color definitions (11 themes)
 - **session.js**: Save/restore editor state to `~/.act-session.json`
 
-## Usage
-
-```bash
-npm install
-node index.js [filename]
-```
-
 ## Key Features
 
 - **Modular Design**: Each component has a single responsibility
