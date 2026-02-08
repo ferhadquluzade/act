@@ -1,0 +1,23 @@
+{
+  "name": "act",
+  "version": "0.1.0",
+  "description": "A terminal text editor written in Javascript/Node.js",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "act": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "editor",
+    "terminal",
+    "text"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "blessed": "^0.1.81"
+  }
+}
