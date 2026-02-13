@@ -1,6 +1,6 @@
-# Act Editor - Modular Structure
+# Act Editor 
 
-A terminal-based text editor built with blessed, organized into clean components.
+A terminal-based text editor built in Javascript/Node.js.
 
 ## Installation
 
@@ -10,6 +10,13 @@ cd act
 npm install
 npm install -g
 ```
+
+## Usage
+
+```
+act file.txt
+```
+> Note: You can also use `act` to get started.
 
 ## Project Structure
 
@@ -84,13 +91,6 @@ act-editor/
 
 - **themes.js**: Theme color definitions (11 themes)
 - **session.js**: Save/restore editor state to `~/.act-session.json`
-
-## Usage
-
-```bash
-npm install
-node index.js [filename]
-```
 
 ## Key Features
 
