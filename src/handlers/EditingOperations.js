@@ -152,4 +152,112 @@ export class EditingOperations {
       ? [start, end]
       : [end, start];
   }
+  
+  deleteWordBackward() {
+    const tab = this.editor.activeTab;
+    if (tab.readOnly) {
+      this.editor.setStatus('Read-only mode - cannot edit');
+      return;
+    }
+    
+    if (tab.selectionStart && tab.selectionEnd) {
+      this.deleteSelection();
+      return;
+    }
+    
+    tab.saveState();
+    const line = tab.lines[tab.cursorY];
+    const startPos = tab.cursorX;
+    
+    if (startPos === 0) {
+      // At beginning of line, delete to end of previous line
+      if (tab.cursorY > 0) {
+        const prevLine = tab.lines[tab.cursorY - 1];
+        const currentLine = tab.lines[tab.cursorY];
+        tab.lines[tab.cursorY - 1] = prevLine + currentLine;
+        tab.lines.splice(tab.cursorY, 1);
+        tab.cursorX = prevLine.length;
+        tab.cursorY--;
+        tab.modified = true;
+        this.editor.adjustScroll();
+      }
+    } else {
+      let pos = startPos;
+      
+      // Move back one position
+      pos--;
+      
+      // Skip whitespace
+      while (pos > 0 && /\s/.test(line[pos])) {
+        pos--;
+      }
+      
+      // Skip word characters
+      if (/\w/.test(line[pos])) {
+        while (pos > 0 && /\w/.test(line[pos - 1])) {
+          pos--;
+        }
+      } else if (!/\s/.test(line[pos])) {
+        // Non-word, non-space characters
+        const charType = line[pos];
+        while (pos > 0 && line[pos - 1] === charType) {
+          pos--;
+        }
+      }
+      
+      // Delete from pos to cursor
+      tab.lines[tab.cursorY] = line.substring(0, pos) + line.substring(startPos);
+      tab.cursorX = pos;
+      tab.modified = true;
+    }
+    
+    this.editor.render();
+  }
+  
+  deleteWordForward() {
+    const tab = this.editor.activeTab;
+    if (tab.readOnly) {
+      this.editor.setStatus('Read-only mode - cannot edit');
+      return;
+    }
+    
+    if (tab.selectionStart && tab.selectionEnd) {
+      this.deleteSelection();
+      return;
+    }
+    
+    tab.saveState();
+    const line = tab.lines[tab.cursorY];
+    const startPos = tab.cursorX;
+    
+    if (startPos === line.length) {
+      // At end of line, delete to beginning of next line
+      if (tab.cursorY < tab.lines.length - 1) {
+        const currentLine = tab.lines[tab.cursorY];
+        const nextLine = tab.lines[tab.cursorY + 1];
+        tab.lines[tab.cursorY] = currentLine + nextLine;
+        tab.lines.splice(tab.cursorY + 1, 1);
+        tab.modified = true;
+      }
+    } else {
+      let pos = startPos;
+      
+      // Skip current word
+      const isWordChar = /\w/.test(line[pos]);
+      while (pos < line.length && /\w/.test(line[pos]) === isWordChar) {
+        pos++;
+      }
+      
+      // Skip whitespace
+      while (pos < line.length && /\s/.test(line[pos])) {
+        pos++;
+      }
+      
+      // Delete from cursor to pos
+      tab.lines[tab.cursorY] = line.substring(0, startPos) + line.substring(pos);
+      tab.modified = true;
+    }
+    
+    this.editor.render();
+  }
 }

@@ -74,9 +74,11 @@ export class UIManager {
       tags: true,
       align: 'left',
       valign: 'top',
-      scrollable: false,
+      scrollable: true,  // Enable scrollable for mouse wheel support
+      alwaysScroll: true,
       keys: false,
-      mouse: false,
+      mouse: true,  // Enable mouse for wheel events
+      wrap: false,  // Disable text wrapping
       border: {
         type: 'line',
         top: true,
@@ -111,5 +113,11 @@ export class UIManager {
   
   getViewportHeight() {
     return Math.max(1, this.contentBox.height - 2);
+  }
+  
+  getViewportWidth() {
+    // Account for line numbers and separator (e.g., "  1 │ ")
+    // We'll estimate based on a typical 4-digit line number + separator
+    return Math.max(1, this.contentBox.width - 8);
   }
 }

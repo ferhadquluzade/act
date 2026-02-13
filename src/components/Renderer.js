@@ -32,30 +32,39 @@ export class Renderer {
     this.uiManager.contentBox.setContent(content);
   }
   
-  renderEditor(tab, themeColor, scrollOffset) {
+  renderEditor(tab, themeColor, scrollOffset, horizontalScrollOffset = 0) {
     const viewportHeight = this.uiManager.getViewportHeight();
     const visibleLines = tab.lines.slice(scrollOffset, scrollOffset + viewportHeight);
     const color = themeColor;
     
+    // Calculate line number width based on total number of lines
+    const totalLines = tab.lines.length;
+    const lineNumWidth = String(totalLines).length;
+    
     let content = '';
     for (let i = 0; i < visibleLines.length; i++) {
       const lineIndex = scrollOffset + i;
-      const lineNum = String(lineIndex + 1).padStart(3, ' ');
-      const line = visibleLines[i] || '';
+      const lineNum = String(lineIndex + 1).padStart(lineNumWidth, ' ');
+      const fullLine = visibleLines[i] || '';
+      
+      // Apply horizontal scrolling to the line
+      const line = fullLine.substring(horizontalScrollOffset);
       
       if (lineIndex === tab.cursorY) {
-        const before = line.substring(0, tab.cursorX);
-        const cursorChar = line[tab.cursorX] || ' ';
-        const after = line.substring(tab.cursorX + 1);
+        // Adjust cursor position for horizontal scroll
+        const adjustedCursorX = tab.cursorX - horizontalScrollOffset;
+        const before = line.substring(0, adjustedCursorX);
+        const cursorChar = line[adjustedCursorX] || ' ';
+        const after = line.substring(adjustedCursorX + 1);
         
         if (tab.selectionStart && tab.selectionEnd) {
-          content += `{${color}-fg}${lineNum} │{/${color}-fg} ${this.renderLineWithSelection(line, lineIndex, tab, scrollOffset)}\n`;
+          content += `{${color}-fg}${lineNum} │{/${color}-fg} ${this.renderLineWithSelection(line, lineIndex, tab, scrollOffset, horizontalScrollOffset)}\n`;
         } else {
           content += `{${color}-fg}${lineNum} │{/${color}-fg} ${before}{inverse}${cursorChar}{/inverse}${after}\n`;
         }
       } else {
         if (tab.selectionStart && tab.selectionEnd) {
-          content += `{${color}-fg}${lineNum} │{/${color}-fg} ${this.renderLineWithSelection(line, lineIndex, tab, scrollOffset)}\n`;
+          content += `{${color}-fg}${lineNum} │{/${color}-fg} ${this.renderLineWithSelection(line, lineIndex, tab, scrollOffset, horizontalScrollOffset)}\n`;
         } else {
           content += `{${color}-fg}${lineNum} │{/${color}-fg} ${line}\n`;
         }
@@ -65,7 +74,7 @@ export class Renderer {
     this.uiManager.contentBox.setContent(content);
   }
   
-  renderLineWithSelection(line, lineIndex, tab, scrollOffset) {
+  renderLineWithSelection(line, lineIndex, tab, scrollOffset, horizontalScrollOffset = 0) {
     if (!tab.selectionStart || !tab.selectionEnd) return line;
     
     const [start, end] = this.getOrderedSelection(tab.selectionStart, tab.selectionEnd);
@@ -74,8 +83,9 @@ export class Renderer {
     
     let result = '';
     for (let i = 0; i < line.length; i++) {
-      const isSelected = this.isCharSelected(i, lineIndex, start, end);
-      const isCursor = lineIndex === tab.cursorY && i === tab.cursorX;
+      const actualX = i + horizontalScrollOffset; // Actual position in the full line
+      const isSelected = this.isCharSelected(actualX, lineIndex, start, end);
+      const isCursor = lineIndex === tab.cursorY && actualX === tab.cursorX;
       
       if (isCursor) {
         result += `{inverse}${line[i]}{/inverse}`;
@@ -86,7 +96,7 @@ export class Renderer {
       }
     }
     
-    if (lineIndex === tab.cursorY && tab.cursorX >= line.length) {
+    if (lineIndex === tab.cursorY && tab.cursorX >= horizontalScrollOffset + line.length) {
       result += '{inverse} {/inverse}';
     }
     

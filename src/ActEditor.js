@@ -86,9 +86,11 @@ export class ActEditor {
   adjustScroll() {
     const tab = this.activeTab;
     const viewportHeight = this.uiManager.getViewportHeight();
+    const viewportWidth = this.uiManager.getViewportWidth();
     
     tab.cursorY = Math.max(0, Math.min(tab.cursorY, tab.lines.length - 1));
     
+    // Vertical scrolling
     if (tab.cursorY < tab.scrollOffset) {
       tab.scrollOffset = tab.cursorY;
     } else if (tab.cursorY >= tab.scrollOffset + viewportHeight) {
@@ -97,6 +99,14 @@ export class ActEditor {
     
     const maxScroll = Math.max(0, tab.lines.length - viewportHeight);
     tab.scrollOffset = Math.max(0, Math.min(tab.scrollOffset, maxScroll));
+    
+    // Horizontal scrolling
+    const margin = 5; // Keep 5 characters margin on each side
+    if (tab.cursorX < tab.horizontalScrollOffset + margin) {
+      tab.horizontalScrollOffset = Math.max(0, tab.cursorX - margin);
+    } else if (tab.cursorX >= tab.horizontalScrollOffset + viewportWidth - margin) {
+      tab.horizontalScrollOffset = Math.max(0, tab.cursorX - viewportWidth + margin);
+    }
   }
   
   render() {
@@ -106,7 +116,7 @@ export class ActEditor {
       this.renderer.renderWelcomePage(this.theme.color, this.theme.name);
     } else {
       this.adjustScroll();
-      this.renderer.renderEditor(tab, this.theme.color, tab.scrollOffset);
+      this.renderer.renderEditor(tab, this.theme.color, tab.scrollOffset, tab.horizontalScrollOffset);
     }
     
     this.renderer.renderStatusBar(
@@ -417,23 +427,58 @@ export class ActEditor {
   }
   
   setupKeyHandlers() {
-    // Raw stdin handler for backspace and delete
+    const screen = this.uiManager.screen;
+    
+    // Raw stdin handler for Alt+Arrow keys only (Shift+arrows are handled by screen.key below)
     process.stdin.on('data', (data) => {
       if (this.inputMode) return;
       
-      const byte = data[0];
-      if (byte === 0x7f || byte === 0x08) {
-        this.editingOps.deleteChar();
+      const bytes = Array.from(data);
+      
+      // Helper to match byte sequences
+      const matchBytes = (sequence) => {
+        if (bytes.length !== sequence.length) return false;
+        return bytes.every((b, i) => b === sequence[i]);
+      };
+      
+      // Alt+Left arrow sequences (move cursor word by word)
+      if (matchBytes([0x1b, 0x5b, 0x31, 0x3b, 0x33, 0x44]) ||  // ESC[1;3D
+          matchBytes([0x1b, 0x62]) ||                            // ESC b
+          matchBytes([0x1b, 0x1b, 0x5b, 0x44])) {               // ESC ESC[D
+        this.cursorMovement.moveWordLeft(false);
         return;
       }
-      if (data.length === 4 && data[0] === 0x1b && data[1] === 0x5b && 
-          data[2] === 0x33 && data[3] === 0x7e) {
-        this.editingOps.deleteForward();
+      
+      // Alt+Right arrow sequences (move cursor word by word)
+      if (matchBytes([0x1b, 0x5b, 0x31, 0x3b, 0x33, 0x43]) ||  // ESC[1;3C
+          matchBytes([0x1b, 0x66]) ||                            // ESC f
+          matchBytes([0x1b, 0x1b, 0x5b, 0x43])) {               // ESC ESC[C
+        this.cursorMovement.moveWordRight(false);
+        return;
+      }
+      
+      // Alt+Shift+Left (select word by word)
+      if (matchBytes([0x1b, 0x5b, 0x31, 0x3b, 0x34, 0x44]) ||
+          matchBytes([0x1b, 0x5b, 0x31, 0x3b, 0x37, 0x44])) {
+        this.cursorMovement.moveWordLeft(true);
+        return;
+      }
+      
+      // Alt+Shift+Right (select word by word)
+      if (matchBytes([0x1b, 0x5b, 0x31, 0x3b, 0x34, 0x43]) ||
+          matchBytes([0x1b, 0x5b, 0x31, 0x3b, 0x37, 0x43])) {
+        this.cursorMovement.moveWordRight(true);
+        return;
+      }
+      
+      // Alt+Delete sequences (delete word forward)
+      if (matchBytes([0x1b, 0x5b, 0x33, 0x3b, 0x33, 0x7e]) ||  // ESC[3;3~
+          matchBytes([0x1b, 0x5b, 0x33, 0x7e]) ||               // ESC[3~
+          matchBytes([0x1b, 0x64])) {                            // ESC d
+        this.editingOps.deleteWordForward();
         return;
       }
     });
-    
-    const screen = this.uiManager.screen;
     
     // Navigation
     screen.key(['up'], () => !this.inputMode && this.cursorMovement.moveCursor(0, -1, false));
@@ -445,6 +490,12 @@ export class ActEditor {
     screen.key(['S-down'], () => !this.inputMode && this.cursorMovement.moveCursor(0, 1, true));
     screen.key(['S-left'], () => !this.inputMode && this.cursorMovement.moveCursor(-1, 0, true));
     screen.key(['S-right'], () => !this.inputMode && this.cursorMovement.moveCursor(1, 0, true));
+    
+    // Word-by-word navigation with Alt/Option
+    screen.key(['M-left'], () => !this.inputMode && this.cursorMovement.moveWordLeft(false));
+    screen.key(['M-right'], () => !this.inputMode && this.cursorMovement.moveWordRight(false));
+    screen.key(['M-S-left'], () => !this.inputMode && this.cursorMovement.moveWordLeft(true));
+    screen.key(['M-S-right'], () => !this.inputMode && this.cursorMovement.moveWordRight(true));
     
     screen.key(['home'], () => this.inputMode ? this.inputHome() : this.cursorMovement.home());
     screen.key(['end'], () => this.inputMode ? this.inputEnd() : this.cursorMovement.end());
@@ -526,6 +577,88 @@ export class ActEditor {
     screen.key(['C-q'], () => {
       this.saveSession();
       process.exit(0);
+    });
+    
+    // Mouse wheel support for scrolling
+    this.uiManager.contentBox.on('wheeldown', () => {
+      if (this.inputMode) return;
+      const tab = this.activeTab;
+      const viewportHeight = this.uiManager.getViewportHeight();
+      const maxScroll = Math.max(0, tab.lines.length - viewportHeight);
+      
+      // Scroll down 3 lines
+      tab.scrollOffset = Math.min(maxScroll, tab.scrollOffset + 3);
+      this.render();
+    });
+    
+    this.uiManager.contentBox.on('wheelup', () => {
+      if (this.inputMode) return;
+      const tab = this.activeTab;
+      
+      // Scroll up 3 lines
+      tab.scrollOffset = Math.max(0, tab.scrollOffset - 3);
+      this.render();
+    });
+    
+    // Shift+wheel for horizontal scrolling
+    this.uiManager.contentBox.on('wheeldown', (data) => {
+      if (this.inputMode) return;
+      if (data && data.shift) {
+        const tab = this.activeTab;
+        // Scroll right 5 characters
+        tab.horizontalScrollOffset += 5;
+        this.render();
+      }
+    });
+    
+    this.uiManager.contentBox.on('wheelup', (data) => {
+      if (this.inputMode) return;
+      if (data && data.shift) {
+        const tab = this.activeTab;
+        // Scroll left 5 characters
+        tab.horizontalScrollOffset = Math.max(0, tab.horizontalScrollOffset - 5);
+        this.render();
+      }
+    });
+    
+    // Mouse click to position cursor
+    this.uiManager.contentBox.on('click', (data) => {
+      if (this.inputMode) return;
+      
+      const tab = this.activeTab;
+      const totalLines = tab.lines.length;
+      const lineNumWidth = String(totalLines).length;
+      
+      // Line number format: "NNN │ " where NNN is right-padded to lineNumWidth
+      // So total offset is: lineNumWidth + " │ ".length = lineNumWidth + 3
+      const lineNumColumnWidth = lineNumWidth + 3;
+      
+      // Account for:
+      // - Status bar height (3 lines)
+      // - Content box border (1 line)
+      // = 4 total lines offset
+      const clickY = data.y - 4;
+      // Subtract 1 more from X to position cursor AT the click, not after it
+      const clickX = data.x - lineNumColumnWidth - 1;
+      
+      if (clickX < 0 || clickY < 0) return;  // Clicked on line numbers or border
+      
+      // Calculate actual line and column based on scroll offsets
+      const lineIndex = tab.scrollOffset + clickY;
+      const columnIndex = tab.horizontalScrollOffset + clickX;
+      
+      // Validate and set cursor position
+      if (lineIndex >= 0 && lineIndex < tab.lines.length) {
+        tab.cursorY = lineIndex;
+        tab.cursorX = Math.min(columnIndex, tab.lines[lineIndex].length);
+        
+        // Clear selection on click
+        tab.selectionStart = null;
+        tab.selectionEnd = null;
+        
+        // Render once
+        this.render();
+      }
     });
     
     // Regular character input

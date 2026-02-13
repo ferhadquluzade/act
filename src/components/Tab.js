@@ -8,6 +8,7 @@ export class Tab {
     this.cursorX = 0;
     this.cursorY = 0;
     this.scrollOffset = 0;
+    this.horizontalScrollOffset = 0;  // Add horizontal scroll
     this.modified = false;
     this.readOnly = false;
     this.undoStack = [];
@@ -36,7 +37,8 @@ export class Tab {
       lines: [...this.lines],
       cursorX: this.cursorX,
       cursorY: this.cursorY,
-      scrollOffset: this.scrollOffset
+      scrollOffset: this.scrollOffset,
+      horizontalScrollOffset: this.horizontalScrollOffset
     };
     this.undoStack.push(state);
     this.redoStack = [];
@@ -47,6 +49,7 @@ export class Tab {
     this.cursorX = state.cursorX;
     this.cursorY = state.cursorY;
     this.scrollOffset = state.scrollOffset;
+    this.horizontalScrollOffset = state.horizontalScrollOffset || 0;
     this.selectionStart = null;
     this.selectionEnd = null;
   }
